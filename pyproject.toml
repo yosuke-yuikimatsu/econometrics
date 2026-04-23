@@ -1,0 +1,26 @@
+[project]
+name = "cbr-bank-reports-parser"
+version = "0.1.0"
+description = "Production-grade parser for Bank of Russia credit organization reports"
+requires-python = ">=3.12"
+dependencies = [
+  "beautifulsoup4==4.12.3",
+  "celery[redis]==5.4.0",
+  "httpx[http2]==0.28.1",
+  "lxml==5.3.0",
+  "orjson==3.10.15",
+  "pydantic==2.11.4",
+  "pydantic-settings==2.8.1",
+  "python-dateutil==2.9.0.post0",
+  "redis==5.2.1",
+  "tenacity==9.0.0",
+  "structlog==25.2.0",
+  "typing-extensions==4.13.2",
+]
+
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["app", "app.parsers", "app.tasks"]

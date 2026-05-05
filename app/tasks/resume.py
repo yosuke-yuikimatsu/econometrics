@@ -13,8 +13,23 @@ def _chunks(items: list[dict], size: int) -> list[list[dict]]:
     return [items[i:i + size] for i in range(0, len(items), size)]
 
 
-@shared_task(bind=True)
-def resume_fetch_report_pages(self, limit: int | None = None) -> dict[str, int]:
+def queue_parse_report_indexes(limit: int | None = None) -> dict[str, int]:
+    store = get_store()
+    rows = store.iter_fetched_unparsed_report_indexes(limit=limit)
+
+    from app.tasks.parse import parse_report_index
+
+    count = 0
+    for row in rows:
+        html_path = row.pop("html_path")
+        parse_report_index.delay(row, html_path)
+        count += 1
+
+    logger.info("resume_parse_report_indexes_queued", indexes=count)
+    return {"indexes": count}
+
+
+def queue_fetch_report_pages(limit: int | None = None) -> dict[str, int]:
     store = get_store()
     links = store.iter_unfetched_report_links(limit=limit)
 
@@ -34,8 +49,7 @@ def resume_fetch_report_pages(self, limit: int | None = None) -> dict[str, int]:
     return {"links": len(links), "batches": len(batches)}
 
 
-@shared_task(bind=True)
-def resume_parse_report_pages(self, limit: int | None = None) -> dict[str, int]:
+def queue_parse_report_pages(limit: int | None = None) -> dict[str, int]:
     store = get_store()
     rows = store.iter_fetched_unparsed_report_pages(limit=limit)
 
@@ -53,26 +67,24 @@ def resume_parse_report_pages(self, limit: int | None = None) -> dict[str, int]:
 
 @shared_task(bind=True)
 def resume_parse_report_indexes(self, limit: int | None = None) -> dict[str, int]:
-    store = get_store()
-    rows = store.iter_fetched_unparsed_report_indexes(limit=limit)
+    return queue_parse_report_indexes(limit=limit)
 
-    from app.tasks.parse import parse_report_index
 
-    count = 0
-    for row in rows:
-        html_path = row.pop("html_path")
-        parse_report_index.delay(row, html_path)
-        count += 1
+@shared_task(bind=True)
+def resume_fetch_report_pages(self, limit: int | None = None) -> dict[str, int]:
+    return queue_fetch_report_pages(limit=limit)
 
-    logger.info("resume_parse_report_indexes_queued", indexes=count)
-    return {"indexes": count}
+
+@shared_task(bind=True)
+def resume_parse_report_pages(self, limit: int | None = None) -> dict[str, int]:
+    return queue_parse_report_pages(limit=limit)
 
 
 @shared_task(bind=True)
 def resume_all(self, limit: int | None = None) -> dict[str, int]:
-    idx = resume_parse_report_indexes.apply(args=[limit]).get()
-    fetch = resume_fetch_report_pages.apply(args=[limit]).get()
-    parse = resume_parse_report_pages.apply(args=[limit]).get()
+    idx = queue_parse_report_indexes(limit=limit)
+    fetch = queue_fetch_report_pages(limit=limit)
+    parse = queue_parse_report_pages(limit=limit)
 
     result = {
         "indexes_queued": idx["indexes"],

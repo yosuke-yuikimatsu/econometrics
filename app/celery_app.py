@@ -28,6 +28,7 @@ celery_app.conf.update(
 
     task_default_retry_delay=5,
     broker_connection_retry_on_startup=True,
+    result_expires=settings.celery_result_expires_seconds,
 
     task_queues=(
         Queue("bootstrap", routing_key="bootstrap"),

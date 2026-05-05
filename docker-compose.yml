@@ -9,66 +9,75 @@ services:
     volumes:
       - redis_data:/data
 
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: cbr_reports
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d cbr_reports"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
   bootstrap:
     build: .
     command: ["python", "-m", "app.cli", "bootstrap"]
-    env_file:
-      - .env
-    volumes:
-      - ./data:/app/data
+    env_file: [.env]
+    volumes: ["./data:/app/data"]
     depends_on:
-      - redis
+      redis: {condition: service_started}
+      postgres: {condition: service_healthy}
 
   worker_bootstrap:
     build: .
     command: ["celery", "-A", "app.celery_app:celery_app", "worker", "-Q", "bootstrap", "-n", "bootstrap@%h", "-l", "INFO", "--concurrency=1"]
-    env_file:
-      - .env
-    volumes:
-      - ./data:/app/data
+    env_file: [.env]
+    volumes: ["./data:/app/data"]
     depends_on:
-      - redis
+      redis: {condition: service_started}
+      postgres: {condition: service_healthy}
 
   worker_fetch:
     build: .
     command: ["celery", "-A", "app.celery_app:celery_app", "worker", "-Q", "fetch", "-n", "fetch@%h", "-l", "INFO", "--concurrency=4"]
-    env_file:
-      - .env
-    volumes:
-      - ./data:/app/data
+    env_file: [.env]
+    volumes: ["./data:/app/data"]
     depends_on:
-      - redis
+      redis: {condition: service_started}
+      postgres: {condition: service_healthy}
 
   worker_parse:
     build: .
     command: ["celery", "-A", "app.celery_app:celery_app", "worker", "-Q", "parse", "-n", "parse@%h", "-l", "INFO", "--concurrency=4"]
-    env_file:
-      - .env
-    volumes:
-      - ./data:/app/data
+    env_file: [.env]
+    volumes: ["./data:/app/data"]
     depends_on:
-      - redis
+      redis: {condition: service_started}
+      postgres: {condition: service_healthy}
 
   worker_aggregate:
     build: .
     command: ["celery", "-A", "app.celery_app:celery_app", "worker", "-Q", "aggregate", "-n", "aggregate@%h", "-l", "INFO", "--concurrency=1"]
-    env_file:
-      - .env
-    volumes:
-      - ./data:/app/data
+    env_file: [.env]
+    volumes: ["./data:/app/data"]
     depends_on:
-      - redis
+      redis: {condition: service_started}
+      postgres: {condition: service_healthy}
 
   monitor:
     build: .
     command: ["python", "-m", "app.cli", "summary", "--watch"]
-    env_file:
-      - .env
-    volumes:
-      - ./data:/app/data
+    env_file: [.env]
+    volumes: ["./data:/app/data"]
     depends_on:
-      - redis
+      redis: {condition: service_started}
+      postgres: {condition: service_healthy}
     profiles: ["monitor"]
 
 volumes:
   redis_data:
+  postgres_data:

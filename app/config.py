@@ -13,7 +13,8 @@ class Settings(BaseSettings):
     broker_url: str = 'redis://redis:6379/0'
     result_backend: str = 'redis://redis:6379/1'
     data_dir: Path = Path('/app/data')
-    state_db_path: Path = Path('/app/data/manifests/state.sqlite3')
+    database_url: str = 'postgresql://postgres:postgres@postgres:5432/cbr_reports'
+    db_pool_max_size: int = 20
     log_level: str = 'INFO'
     http_timeout_seconds: int = 30
     http_connect_timeout_seconds: int = 10
@@ -28,6 +29,7 @@ class Settings(BaseSettings):
     aggregate_bank_batch_size: int = 100
     celery_prefetch_multiplier: int = 1
     celery_task_acks_late: bool = True
+    celery_result_expires_seconds: int = 3600
     bank_limit: int = 0
     only_ogrn: str = ''
     user_agent: str = 'Mozilla/5.0 (compatible; CBRReportsBot/1.0; +https://www.cbr.ru)'

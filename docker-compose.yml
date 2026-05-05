@@ -15,6 +15,12 @@ services:
       POSTGRES_DB: cbr_reports
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
+      POSTGRES_SHARED_BUFFERS: 8GB           
+      POSTGRES_EFFECTIVE_CACHE_SIZE: 24GB    
+      POSTGRES_WORK_MEM: 64MB               
+      POSTGRES_MAINTENANCE_WORK_MEM: 1GB     
+      POSTGRES_MAX_CONNECTIONS: 100         
+      POSTGRES_WAL_BUFFERS: 256MB
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d cbr_reports"]
       interval: 5s
@@ -43,7 +49,7 @@ services:
 
   worker_fetch:
     build: .
-    command: ["celery", "-A", "app.celery_app:celery_app", "worker", "-Q", "fetch", "-n", "fetch@%h", "-l", "INFO", "--concurrency=8"]
+    command: ["celery", "-A", "app.celery_app:celery_app", "worker", "-Q", "fetch", "-n", "fetch@%h", "-l", "INFO", "--concurrency=24"]
     env_file: [.env]
     volumes: ["./data:/app/data"]
     depends_on:
@@ -52,7 +58,7 @@ services:
 
   worker_parse:
     build: .
-    command: ["celery", "-A", "app.celery_app:celery_app", "worker", "-Q", "parse", "-n", "parse@%h", "-l", "INFO", "--concurrency=8"]
+    command: ["celery", "-A", "app.celery_app:celery_app", "worker", "-Q", "parse", "-n", "parse@%h", "-l", "INFO", "--concurrency=12"]
     env_file: [.env]
     volumes: ["./data:/app/data"]
     depends_on:

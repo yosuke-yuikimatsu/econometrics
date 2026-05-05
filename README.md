@@ -7,8 +7,10 @@ Production-grade parser for credit organization reports from cbr.ru.
 ```bash
 cp .env.example .env
 mkdir -p data/raw data/parsed/reports data/parsed/banks data/manifests
-docker compose build
-docker compose up -d redis worker_bootstrap worker_fetch worker_parse worker_aggregate
+docker compose build --no-cache
+docker compose up -d postgres redis
+docker compose run --rm bootstrap python -m app.cli init-db
+docker compose up -d worker_bootstrap worker_fetch worker_parse worker_aggregate
 docker compose run --rm bootstrap
 ```
 
@@ -55,3 +57,5 @@ python -m app.cli summary --watch
 
 ## Architecture and performance
 See `docs/PERFORMANCE.md` for PostgreSQL/Celery pipeline details and tuning notes.
+
+

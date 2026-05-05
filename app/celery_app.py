@@ -42,6 +42,7 @@ celery_app.conf.update(
         "app.tasks.fetch.*": {"queue": "fetch", "routing_key": "fetch"},
         "app.tasks.parse.*": {"queue": "parse", "routing_key": "parse"},
         "app.tasks.aggregate.*": {"queue": "aggregate", "routing_key": "aggregate"},
+        "app.tasks.resume.*": {"queue": "bootstrap", "routing_key": "bootstrap"},
     },
 
     imports=(
@@ -49,6 +50,7 @@ celery_app.conf.update(
         "app.tasks.fetch",
         "app.tasks.parse",
         "app.tasks.aggregate",
+        "app.tasks.resume",
     ),
 )
 

@@ -272,21 +272,187 @@ class StateStore:
         with self.connect() as conn, conn.cursor() as cur:
             cur.execute('SELECT * FROM parsed_reports WHERE ogrn=%s ORDER BY COALESCE(form_code, form_name), report_date, url_hash', (ogrn,))
             return cur.fetchall()
+    def iter_unfetched_report_links(self, limit: int | None = None) -> list[dict[str, Any]]:
+        query = """
+            SELECT
+                rl.url AS report_url,
+                rl.ogrn,
+                rl.reg_number,
+                rl.bank_name,
+                rl.reports_page_url,
+                rl.section_name,
+                rl.form_name,
+                rl.form_code,
+                rl.form_meta_json AS form_meta,
+                rl.report_date,
+                rl.report_date_label,
+                rl.report_year,
+                rl.title_hint
+            FROM report_links rl
+            LEFT JOIN pages p ON p.url_hash = rl.url_hash
+            WHERE
+                p.url_hash IS NULL
+                OR p.fetch_status <> 'fetched'
+                OR p.html_path IS NULL
+            ORDER BY rl.ogrn, rl.form_code, rl.form_name, rl.report_date, rl.url
+        """
+        params: tuple[Any, ...] = ()
 
-    def counters(self) -> dict[str, int]:
-        queries = {
-            'banks_discovered': 'SELECT COUNT(*) AS cnt FROM banks',
-            'banks_active': 'SELECT COUNT(*) AS cnt FROM banks WHERE active=TRUE',
-            'report_index_pages_fetched': "SELECT COUNT(*) AS cnt FROM pages WHERE page_kind='reports_index' AND fetch_status='fetched'",
-            'report_pages_fetched': "SELECT COUNT(*) AS cnt FROM pages WHERE page_kind='report_page' AND fetch_status='fetched'",
-            'report_pages_parsed': "SELECT COUNT(*) AS cnt FROM pages WHERE page_kind='report_page' AND parse_status='parsed'",
-            'errors': 'SELECT COUNT(*) AS cnt FROM failures',
-            'retries': "SELECT COALESCE(SUM(CASE WHEN fetch_attempts > 1 THEN fetch_attempts - 1 ELSE 0 END),0) + COALESCE(SUM(CASE WHEN parse_attempts > 1 THEN parse_attempts - 1 ELSE 0 END),0) AS cnt FROM pages",
-            'reports_discovered': 'SELECT COUNT(*) AS cnt FROM report_links',
-        }
-        out: dict[str, int] = {}
+        if limit is not None:
+            query += " LIMIT %s"
+            params = (limit,)
+
         with self.connect() as conn, conn.cursor() as cur:
-            for k, q in queries.items():
-                cur.execute(q)
-                out[k] = int(cur.fetchone()['cnt'])
+            cur.execute(query, params)
+            return cur.fetchall()
+    
+    def iter_fetched_unparsed_report_pages(self, limit: int | None = None) -> list[dict[str, Any]]:
+        query = """
+            SELECT
+                rl.url AS report_url,
+                rl.ogrn,
+                rl.reg_number,
+                rl.bank_name,
+                rl.reports_page_url,
+                rl.section_name,
+                rl.form_name,
+                rl.form_code,
+                rl.form_meta_json AS form_meta,
+                rl.report_date,
+                rl.report_date_label,
+                rl.report_year,
+                rl.title_hint,
+                p.html_path
+            FROM report_links rl
+            JOIN pages p ON p.url_hash = rl.url_hash
+            LEFT JOIN parsed_reports pr ON pr.url_hash = rl.url_hash
+            WHERE
+                p.page_kind = 'report_page'
+                AND p.fetch_status = 'fetched'
+                AND p.html_path IS NOT NULL
+                AND p.parse_status <> 'parsed'
+                AND pr.url_hash IS NULL
+            ORDER BY rl.ogrn, rl.form_code, rl.form_name, rl.report_date, rl.url
+        """
+        params: tuple[Any, ...] = ()
+
+        if limit is not None:
+            query += " LIMIT %s"
+            params = (limit,)
+
+        with self.connect() as conn, conn.cursor() as cur:
+            cur.execute(query, params)
+            return cur.fetchall()
+        
+    def iter_fetched_unparsed_report_indexes(self, limit: int | None = None) -> list[dict[str, Any]]:
+        query = """
+            SELECT
+                b.ogrn,
+                b.reg_number,
+                b.name,
+                b.license_status,
+                b.org_type,
+                b.legal_form,
+                b.registration_date,
+                b.address,
+                b.source_url,
+                b.reports_page_url,
+                p.html_path
+            FROM banks b
+            JOIN pages p ON p.url = b.reports_page_url
+            WHERE
+                b.active = TRUE
+                AND p.page_kind = 'reports_index'
+                AND p.fetch_status = 'fetched'
+                AND p.html_path IS NOT NULL
+                AND p.parse_status <> 'parsed'
+            ORDER BY b.ogrn
+        """
+        params: tuple[Any, ...] = ()
+
+        if limit is not None:
+            query += " LIMIT %s"
+            params = (limit,)
+
+        with self.connect() as conn, conn.cursor() as cur:
+            cur.execute(query, params)
+            return cur.fetchall()
+
+    def counters(self) -> dict[str, int | float]:
+        out: dict[str, int | float] = {}
+
+        with self.connect() as conn, conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT
+                    COUNT(*) FILTER (WHERE active=TRUE) AS banks_active,
+                    COUNT(*) AS banks_discovered
+                FROM banks
+                """
+            )
+            row = cur.fetchone()
+            out["banks_discovered"] = int(row["banks_discovered"])
+            out["banks_active"] = int(row["banks_active"])
+
+            cur.execute(
+                """
+                SELECT
+                    COUNT(*) FILTER (WHERE page_kind='reports_index') AS report_index_total,
+                    COUNT(*) FILTER (WHERE page_kind='reports_index' AND fetch_status='fetched') AS report_index_fetched,
+                    COUNT(*) FILTER (WHERE page_kind='reports_index' AND parse_status='parsed') AS report_index_parsed,
+
+                    COUNT(*) FILTER (WHERE page_kind='report_page') AS report_pages_total,
+                    COUNT(*) FILTER (WHERE page_kind='report_page' AND fetch_status='fetched') AS report_pages_fetched,
+                    COUNT(*) FILTER (WHERE page_kind='report_page' AND parse_status='parsed') AS report_pages_parsed,
+
+                    COUNT(*) FILTER (WHERE fetch_status='error') AS fetch_errors,
+                    COUNT(*) FILTER (WHERE parse_status='error') AS parse_errors
+                FROM pages
+                """
+            )
+            row = cur.fetchone()
+
+            for key in [
+                "report_index_total",
+                "report_index_fetched",
+                "report_index_parsed",
+                "report_pages_total",
+                "report_pages_fetched",
+                "report_pages_parsed",
+                "fetch_errors",
+                "parse_errors",
+            ]:
+                out[key] = int(row[key] or 0)
+
+            total = int(row["report_pages_total"] or 0)
+            fetched = int(row["report_pages_fetched"] or 0)
+            parsed = int(row["report_pages_parsed"] or 0)
+
+            out["report_pages_fetch_remaining"] = max(total - fetched, 0)
+            out["report_pages_parse_remaining"] = max(total - parsed, 0)
+
+            out["report_pages_fetch_pct"] = round(100.0 * fetched / total, 2) if total else 0.0
+            out["report_pages_parse_pct"] = round(100.0 * parsed / total, 2) if total else 0.0
+
+            cur.execute("SELECT COUNT(*) AS cnt FROM report_links")
+            out["reports_discovered"] = int(cur.fetchone()["cnt"])
+
+            cur.execute("SELECT COUNT(*) AS cnt FROM parsed_reports")
+            out["parsed_reports_saved"] = int(cur.fetchone()["cnt"])
+
+            cur.execute("SELECT COUNT(*) AS cnt FROM failures")
+            out["errors"] = int(cur.fetchone()["cnt"])
+
+            cur.execute(
+                """
+                SELECT
+                    COALESCE(SUM(CASE WHEN fetch_attempts > 1 THEN fetch_attempts - 1 ELSE 0 END), 0)
+                    +
+                    COALESCE(SUM(CASE WHEN parse_attempts > 1 THEN parse_attempts - 1 ELSE 0 END), 0)
+                    AS cnt
+                FROM pages
+                """
+            )
+            out["retries"] = int(cur.fetchone()["cnt"])
+
         return out

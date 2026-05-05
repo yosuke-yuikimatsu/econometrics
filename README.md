@@ -51,3 +51,7 @@ Output:
 docker compose logs -f worker_fetch worker_parse worker_aggregate
 python -m app.cli summary --watch
 ```
+
+
+## Architecture and performance
+See `docs/PERFORMANCE.md` for PostgreSQL/Celery pipeline details and tuning notes.

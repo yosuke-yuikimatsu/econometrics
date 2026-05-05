@@ -14,6 +14,11 @@ from app.store_provider import get_store
 logger = structlog.get_logger(__name__)
 #store = StateStore()
 
+def atomic_write_json(path: Path, payload: dict) -> None:
+    tmp_path = path.with_suffix(path.suffix + ".tmp")
+    tmp_path.write_bytes(orjson.dumps(payload))
+    tmp_path.replace(path)
+
 
 def _load_json(path: str) -> dict:
     return orjson.loads(Path(path).read_bytes())
@@ -58,7 +63,7 @@ def update_bank_snapshot(self, ogrn: str) -> dict[str, str]:
     }
     out_path = settings.parsed_banks_dir / f'{ogrn}.json'
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    out_path.write_bytes(orjson.dumps(bank_json, option=orjson.OPT_INDENT_2))
+    atomic_write_json(out_path, bank_json)
     return {'status': 'ok', 'ogrn': ogrn, 'path': str(out_path)}
 
 
@@ -83,6 +88,6 @@ def finalize_all(self) -> dict[str, str | int]:
         'banks': banks_out,
     }
     out_path = settings.data_dir / 'parsed' / 'all_banks_reports.json'
-    out_path.write_bytes(orjson.dumps(result, option=orjson.OPT_INDENT_2))
+    atomic_write_json(out_path, result)
     logger.info('finalize_done', path=str(out_path), banks_total=len(banks_out), reports_total=reports_total)
     return {'path': str(out_path), 'banks_total': len(banks_out), 'reports_total': reports_total}

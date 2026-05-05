@@ -3,7 +3,14 @@ version: "3.9"
 services:
   redis:
     image: redis:7.4-alpine
-    command: ["redis-server", "--appendonly", "yes"]
+    command:
+      [
+        "redis-server",
+        "--appendonly", "no",
+        "--save", "",
+        "--maxmemory", "4gb",
+        "--maxmemory-policy", "noeviction"
+      ]
     ports:
       - "6379:6379"
     volumes:
@@ -49,7 +56,7 @@ services:
 
   worker_fetch:
     build: .
-    command: ["celery", "-A", "app.celery_app:celery_app", "worker", "-Q", "fetch", "-n", "fetch@%h", "-l", "INFO", "--concurrency=24"]
+    command: ["celery", "-A", "app.celery_app:celery_app", "worker", "-Q", "fetch", "-n", "fetch@%h", "-l", "INFO", "--concurrency=12"]
     env_file: [.env]
     volumes: ["./data:/app/data"]
     depends_on:
@@ -58,7 +65,7 @@ services:
 
   worker_parse:
     build: .
-    command: ["celery", "-A", "app.celery_app:celery_app", "worker", "-Q", "parse", "-n", "parse@%h", "-l", "INFO", "--concurrency=12"]
+    command: ["celery", "-A", "app.celery_app:celery_app", "worker", "-Q", "parse", "-n", "parse@%h", "-l", "INFO", "--concurrency=8"]
     env_file: [.env]
     volumes: ["./data:/app/data"]
     depends_on:

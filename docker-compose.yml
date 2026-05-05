@@ -43,7 +43,7 @@ services:
 
   worker_fetch:
     build: .
-    command: ["celery", "-A", "app.celery_app:celery_app", "worker", "-Q", "fetch", "-n", "fetch@%h", "-l", "INFO", "--concurrency=4"]
+    command: ["celery", "-A", "app.celery_app:celery_app", "worker", "-Q", "fetch", "-n", "fetch@%h", "-l", "INFO", "--concurrency=8"]
     env_file: [.env]
     volumes: ["./data:/app/data"]
     depends_on:
@@ -52,7 +52,7 @@ services:
 
   worker_parse:
     build: .
-    command: ["celery", "-A", "app.celery_app:celery_app", "worker", "-Q", "parse", "-n", "parse@%h", "-l", "INFO", "--concurrency=4"]
+    command: ["celery", "-A", "app.celery_app:celery_app", "worker", "-Q", "parse", "-n", "parse@%h", "-l", "INFO", "--concurrency=8"]
     env_file: [.env]
     volumes: ["./data:/app/data"]
     depends_on:

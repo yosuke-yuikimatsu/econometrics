@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+
+from psycopg.types.json import Jsonb
+
 from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
@@ -99,9 +102,15 @@ CREATE TABLE IF NOT EXISTS failures (
 
 
 class StateStore:
-    def __init__(self) -> None:
-        self.pool = ConnectionPool(conninfo=settings.database_url, kwargs={"row_factory": dict_row}, min_size=1, max_size=settings.db_pool_max_size)
-        self.init_schema()
+    def __init__(self, init_schema: bool = False) -> None:
+        self.pool = ConnectionPool(
+            conninfo=settings.database_url,
+            kwargs={"row_factory": dict_row},
+            min_size=1,
+            max_size=settings.db_pool_max_size,
+        )
+        if init_schema:
+            self.init_schema()
 
     @contextmanager
     def connect(self) -> Iterator[Any]:
@@ -183,21 +192,59 @@ class StateStore:
             cur.execute("UPDATE pages SET parse_status='parsed', parsed_at=%s, parse_attempts=parse_attempts+1, updated_at=%s WHERE url_hash=%s", (now, now, sha256_text(url)))
 
     def upsert_report_links_bulk(self, links: list[ReportLinkRecord]) -> None:
+        if not links:
+            return
+
         now = self._now()
-        values = [(
-            sha256_text(l.report_url), l.report_url, l.ogrn, l.reg_number, l.bank_name, l.reports_page_url, l.section_name,
-            l.form_name, l.form_code, orjson.loads(orjson.dumps(l.form_meta)), l.report_date, l.report_date_label, l.report_year, l.title_hint, now, now,
-        ) for l in links]
+        values = [
+            (
+                sha256_text(l.report_url),
+                l.report_url,
+                l.ogrn,
+                l.reg_number,
+                l.bank_name,
+                l.reports_page_url,
+                l.section_name,
+                l.form_name,
+                l.form_code,
+                Jsonb(l.form_meta),
+                l.report_date,
+                l.report_date_label,
+                l.report_year,
+                l.title_hint,
+                now,
+                now,
+            )
+            for l in links
+        ]
+
         with self.connect() as conn, conn.cursor() as cur:
-            cur.executemany("""
-                INSERT INTO report_links (url_hash, url, ogrn, reg_number, bank_name, reports_page_url, section_name, form_name, form_code, form_meta_json, report_date, report_date_label, report_year, title_hint, created_at, updated_at)
+            cur.executemany(
+                """
+                INSERT INTO report_links (
+                    url_hash, url, ogrn, reg_number, bank_name, reports_page_url,
+                    section_name, form_name, form_code, form_meta_json,
+                    report_date, report_date_label, report_year, title_hint,
+                    created_at, updated_at
+                )
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 ON CONFLICT(url_hash) DO UPDATE SET
-                    ogrn=excluded.ogrn, reg_number=excluded.reg_number, bank_name=excluded.bank_name, reports_page_url=excluded.reports_page_url,
-                    section_name=excluded.section_name, form_name=excluded.form_name, form_code=excluded.form_code, form_meta_json=excluded.form_meta_json,
-                    report_date=COALESCE(excluded.report_date, report_links.report_date), report_date_label=COALESCE(excluded.report_date_label, report_links.report_date_label),
-                    report_year=COALESCE(excluded.report_year, report_links.report_year), title_hint=COALESCE(excluded.title_hint, report_links.title_hint), updated_at=excluded.updated_at
-                """, values)
+                    ogrn=excluded.ogrn,
+                    reg_number=excluded.reg_number,
+                    bank_name=excluded.bank_name,
+                    reports_page_url=excluded.reports_page_url,
+                    section_name=excluded.section_name,
+                    form_name=excluded.form_name,
+                    form_code=excluded.form_code,
+                    form_meta_json=excluded.form_meta_json,
+                    report_date=COALESCE(excluded.report_date, report_links.report_date),
+                    report_date_label=COALESCE(excluded.report_date_label, report_links.report_date_label),
+                    report_year=COALESCE(excluded.report_year, report_links.report_year),
+                    title_hint=COALESCE(excluded.title_hint, report_links.title_hint),
+                    updated_at=excluded.updated_at
+                """,
+                values,
+            )
 
     def save_parsed_report(self, report: ParsedReport) -> Path:
         url_hash = sha256_text(report.report_url)

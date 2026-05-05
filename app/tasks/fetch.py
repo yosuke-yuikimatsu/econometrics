@@ -8,11 +8,11 @@ import structlog
 
 from app.config import settings
 from app.http_client import AsyncFetcher
-from app.storage import StateStore
+from app.store_provider import get_store
 from app.utils import ensure_parent, sha256_bytes, sha256_text
 
 logger = structlog.get_logger(__name__)
-store = StateStore()
+#store = StateStore()
 
 
 def _raw_path(url: str, page_kind: str) -> Path:
@@ -20,6 +20,7 @@ def _raw_path(url: str, page_kind: str) -> Path:
 
 
 async def _fetch_and_cache(records: list[dict], page_kind: str) -> list[dict]:
+    store = get_store()
     fetcher = AsyncFetcher()
     try:
         store.register_pages_bulk(records)

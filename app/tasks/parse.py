@@ -9,14 +9,14 @@ from app.config import settings
 from app.models import ReportLinkRecord
 from app.parsers.report_page import parse_report_page as parse_report_page_html
 from app.parsers.reports_index import parse_reports_index
-from app.storage import StateStore
+from app.store_provider import get_store
 
 logger = structlog.get_logger(__name__)
-store = StateStore()
 
 
 @shared_task(bind=True, ignore_result=True, autoretry_for=(Exception,), retry_backoff=True, retry_backoff_max=600, retry_jitter=True, max_retries=7)
 def parse_report_index(self, bank: dict, html_path: str) -> None:
+    store = get_store()
     html = Path(html_path).read_text('utf-8')
     links = parse_reports_index(
         html=html,
@@ -42,6 +42,7 @@ def parse_report_index(self, bank: dict, html_path: str) -> None:
 
 @shared_task(bind=True, ignore_result=True, autoretry_for=(Exception,), retry_backoff=True, retry_backoff_max=600, retry_jitter=True, max_retries=7)
 def parse_report_page(self, link_payload: dict, html_path: str) -> None:
+    store = get_store()
     link = ReportLinkRecord(**link_payload)
     html = Path(html_path).read_text('utf-8')
     report = parse_report_page_html(html, link)

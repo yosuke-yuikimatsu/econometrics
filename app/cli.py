@@ -36,12 +36,17 @@ def cmd_summary(watch: bool) -> None:
         _print_summary()
         time.sleep(5)
 
+def cmd_init_db() -> None:
+    store = StateStore(init_schema=True)
+    print("database schema initialized")
+
 
 def main() -> None:
     parser = argparse.ArgumentParser()
     sub = parser.add_subparsers(dest="cmd", required=True)
     sub.add_parser("bootstrap")
     sub.add_parser("finalize")
+    sub.add_parser("init-db")
     s = sub.add_parser("summary")
     s.add_argument("--watch", action="store_true")
     args = parser.parse_args()
@@ -52,6 +57,8 @@ def main() -> None:
         cmd_finalize()
     elif args.cmd == "summary":
         cmd_summary(args.watch)
+    elif args.cmd == "init-db":
+        cmd_init_db()
 
 
 if __name__ == "__main__":

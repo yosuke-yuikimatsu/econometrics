@@ -9,10 +9,10 @@ import orjson
 import structlog
 
 from app.config import settings
-from app.storage import StateStore
-
+#from app.storage import StateStore
+from app.store_provider import get_store
 logger = structlog.get_logger(__name__)
-store = StateStore()
+#store = StateStore()
 
 
 def _load_json(path: str) -> dict:
@@ -21,6 +21,7 @@ def _load_json(path: str) -> dict:
 
 @shared_task(bind=True)
 def update_bank_snapshot(self, ogrn: str) -> dict[str, str]:
+    store = get_store()
     banks = {row['ogrn']: row for row in store.iter_active_banks()}
     bank = banks.get(ogrn)
     if bank is None:
@@ -63,6 +64,7 @@ def update_bank_snapshot(self, ogrn: str) -> dict[str, str]:
 
 @shared_task(bind=True)
 def finalize_all(self) -> dict[str, str | int]:
+    store = get_store()
     banks_out = []
     reports_total = 0
     for bank in store.iter_active_banks():

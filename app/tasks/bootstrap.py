@@ -8,11 +8,12 @@ import structlog
 from app.http_client import AsyncFetcher
 from app.models import BankRecord
 from app.parsers.banks import parse_banks_list
-from app.storage import StateStore
+#from app.storage import StateStore
 from app.config import settings
+from app.store_provider import get_store
 
 logger = structlog.get_logger(__name__)
-store = StateStore()
+#store = StateStore()
 
 
 def _is_active_license(status: str) -> bool:
@@ -30,6 +31,7 @@ def discover_banks(self) -> dict[str, int]:
         finally:
             await fetcher.aclose()
 
+    store = get_store()
     html = __import__('asyncio').run(_run())
     banks = parse_banks_list(html, settings.cbr_full_list_url)
     filtered: list[BankRecord] = []

@@ -51,7 +51,7 @@ Output:
 
 ```bash
 docker compose logs -f worker_fetch worker_parse worker_aggregate
-python -m app.cli summary --watch
+watch -n 10 'df -h; echo; find data/parsed/banks -type f | wc -l; du -sh data/parsed/banks data/parsed/all_banks_reports.json 2>/dev/null; ls -lh data/parsed/all_banks_reports.json 2>/dev/null'(VM specific)
 ```
 
 

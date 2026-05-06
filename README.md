@@ -4,6 +4,8 @@ Production-grade parser for credit organization reports from cbr.ru.
 
 ## Start
 
+### *Increase concurrency for worker-parser. In the current setup it takes more than an hour to just parse*
+
 ```bash
 cp .env.example .env
 mkdir -p data/raw data/parsed/reports data/parsed/banks data/manifests

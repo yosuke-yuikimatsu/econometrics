@@ -38,6 +38,13 @@ def _dir_size(path: Path) -> str:
     except Exception:
         return "n/a"
 
+def cmd_build_bank_snapshots() -> None:
+    res = celery_app.send_task(
+        "app.tasks.aggregate.build_missing_bank_snapshots",
+        queue="aggregate",
+        routing_key="aggregate",
+    )
+    print(f"build-bank-snapshots task queued: {res.id}")
 
 def cmd_resume(limit: int | None) -> None:
     res = celery_app.send_task(
@@ -116,6 +123,7 @@ def main() -> None:
     sub.add_parser("bootstrap")
     sub.add_parser("finalize")
     sub.add_parser("init-db")
+    sub.add_parser("build-bank-snapshots")
     s = sub.add_parser("summary")
     s.add_argument("--watch", action="store_true")
     r = sub.add_parser("resume")
@@ -142,6 +150,8 @@ def main() -> None:
         cmd_resume_fetch(args.limit)
     elif args.cmd == "resume-parse":
         cmd_resume_parse(args.limit)
+    elif args.cmd == "build-bank-snapshots":
+        cmd_build_bank_snapshots()
     
 
 

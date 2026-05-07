@@ -91,3 +91,32 @@ def finalize_all(self) -> dict[str, str | int]:
     atomic_write_json(out_path, result)
     logger.info('finalize_done', path=str(out_path), banks_total=len(banks_out), reports_total=reports_total)
     return {'path': str(out_path), 'banks_total': len(banks_out), 'reports_total': reports_total}
+
+
+@shared_task(bind=True)
+def build_missing_bank_snapshots(self) -> dict[str, int]:
+    store = get_store()
+
+    queued = 0
+    skipped = 0
+
+    for bank in store.iter_active_banks():
+        bank_path = settings.parsed_banks_dir / f"{bank['ogrn']}.json"
+
+        if bank_path.exists():
+            skipped += 1
+            continue
+
+        update_bank_snapshot.delay(bank["ogrn"])
+        queued += 1
+
+    logger.info(
+        "missing_bank_snapshots_queued",
+        queued=queued,
+        skipped=skipped,
+    )
+
+    return {
+        "queued": queued,
+        "skipped": skipped,
+    }

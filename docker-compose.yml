@@ -74,7 +74,7 @@ services:
 
   worker_aggregate:
     build: .
-    command: ["celery", "-A", "app.celery_app:celery_app", "worker", "-Q", "aggregate", "-n", "aggregate@%h", "-l", "INFO", "--concurrency=4"]
+    command: ["celery", "-A", "app.celery_app:celery_app", "worker", "-Q", "aggregate", "-n", "aggregate@%h", "-l", "INFO", "--concurrency=8"]
     env_file: [.env]
     volumes: ["./data:/app/data"]
     depends_on:
